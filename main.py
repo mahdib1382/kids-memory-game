@@ -1,14 +1,27 @@
 """
 بازی حافظه کودکان (Kids Memory Game)
-فاز پنجم: UI/UX - منو، تنظیمات، امتیازبندی، و گوینده
+نسخه 1.0
+یک بازی آموزشی برای کمک به یادگیری اعداد برای دانش‌آموزان کلاس سوم
 """
 
 from ursina import *
 from pathlib import Path
 import os
+import sys
 import json
 import time
 from datetime import datetime
+
+# تابع برای دریافت مسیر صحیح فایل‌ها (برای فایل اجرایی)
+def get_resource_path(relative_path):
+    """دریافت مسیر صحیح برای فایل‌ها (برای PyInstaller)"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    
+    return os.path.join(base_path, relative_path)
 
 # متغیر سراسری برای مدیر بازی (برای دسترسی از کارت‌ها)
 game_manager = None
@@ -22,7 +35,9 @@ class DataManager:
     """
     def __init__(self, filename='game_results.json'):
         self.filename = filename
-        self.filepath = Path(filename)
+        # برای فایل JSON، از پوشه جاری استفاده می‌کنیم نه _MEIPASS
+        # تا داده‌ها در کنار فایل اجرایی ذخیره شوند
+        self.filepath = Path(os.path.join(os.getcwd(), filename))
     
     def save_game_result(self, winner, game_time, num_players, scores):
         """ذخیره نتیجه بازی"""
@@ -76,7 +91,7 @@ class VoiceoverManager:
     
     def load_voiceovers(self):
         """بارگذاری فایل‌های صوتی اعداد"""
-        voice_path = Path('assets/voices')
+        voice_path = Path(get_resource_path('assets/voices'))
         if voice_path.exists():
             # بارگذاری اعداد 1 تا 20
             for i in range(1, 21):
@@ -439,7 +454,7 @@ class AudioManager:
     
     def load_sounds(self):
         """بارگذاری فایل‌های صوتی از پوشه assets/sounds"""
-        sounds_path = Path('assets/sounds')
+        sounds_path = Path(get_resource_path('assets/sounds'))
         if sounds_path.exists():
             # بارگذاری صداها
             sound_files = {
@@ -585,7 +600,7 @@ class NumberCard(Entity):
     
     def _load_texture(self, number):
         """بارگذاری تصویر عدد از پوشه assets/textures"""
-        texture_path = Path(f'assets/textures/{number}.png')
+        texture_path = Path(get_resource_path(f'assets/textures/{number}.png'))
         if texture_path.exists():
             try:
                 return load_texture(str(texture_path))

@@ -35,3 +35,17 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+*.spec
+version_info.txt
+KidsMemoryGame_Final/
+icon.ico
+
+# Backup files
+*_backup.py
+*_OLD.md
+
+# Test files (keep in repo but exclude from build)
+demo*.py
+test_*.py
