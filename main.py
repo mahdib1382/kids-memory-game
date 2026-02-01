@@ -1,17 +1,115 @@
 """
 بازی حافظه کودکان (Kids Memory Game)
-فاز دوم: منطق بازی - تطبیق، نوبت، و امتیازدهی
+فاز سوم و چهارم: جلوه‌های بصری، صداگذاری، و ذرات
 """
 
 from ursina import *
+from pathlib import Path
+import os
 
 # متغیر سراسری برای مدیر بازی (برای دسترسی از کارت‌ها)
 game_manager = None
 
 
+class AudioManager:
+    """
+    مدیر صداها برای پخش جلوه‌های صوتی
+    """
+    def __init__(self):
+        self.sounds = {}
+        self.load_sounds()
+    
+    def load_sounds(self):
+        """بارگذاری فایل‌های صوتی از پوشه assets/sounds"""
+        sounds_path = Path('assets/sounds')
+        if sounds_path.exists():
+            # بارگذاری صداها
+            sound_files = {
+                'click': 'click.wav',
+                'success': 'success.mp3',
+                'wrong': 'wrong.wav'
+            }
+            
+            for sound_name, filename in sound_files.items():
+                sound_file = sounds_path / filename
+                if sound_file.exists():
+                    try:
+                        self.sounds[sound_name] = Audio(str(sound_file), loop=False, autoplay=False)
+                    except:
+                        print(f"⚠️ نمی‌توان صدای {filename} را بارگذاری کرد")
+    
+    def play(self, sound_name):
+        """پخش یک صدای خاص"""
+        if sound_name in self.sounds:
+            try:
+                self.sounds[sound_name].play()
+            except:
+                pass  # در صورت خطا، بی‌صدا ادامه می‌دهیم
+
+
+class ConfettiParticle(Entity):
+    """
+    یک ذره رنگی برای جشن موفقیت
+    """
+    def __init__(self, position, **kwargs):
+        import random
+        
+        # انتخاب رنگ تصادفی
+        colors = [color.yellow, color.orange, color.pink, color.cyan, color.lime, color.magenta]
+        particle_color = random.choice(colors)
+        
+        super().__init__(
+            model='quad',
+            color=particle_color,
+            position=position,
+            scale=0.15,
+            **kwargs
+        )
+        
+        # سرعت اولیه تصادفی
+        self.velocity = Vec3(
+            random.uniform(-3, 3),
+            random.uniform(3, 6),
+            random.uniform(-1, 1)
+        )
+        
+        # شتاب گرانش
+        self.gravity = -15
+        
+        # زمان زندگی
+        self.lifetime = 1.5
+        self.age = 0
+    
+    def update(self):
+        """به‌روزرسانی موقعیت ذره"""
+        dt = time.dt
+        self.age += dt
+        
+        if self.age >= self.lifetime:
+            destroy(self)
+            return
+        
+        # اعمال گرانش
+        self.velocity.y += self.gravity * dt
+        
+        # به‌روزرسانی موقعیت
+        self.position += self.velocity * dt
+        
+        # چرخش
+        self.rotation_z += 360 * dt
+        
+        # محو شدن
+        self.color = color.rgba(
+            self.color.r * 255,
+            self.color.g * 255,
+            self.color.b * 255,
+            int(255 * (1 - self.age / self.lifetime))
+        )
+
+
 class NumberCard(Entity):
     """
-    کلاس کارت با قابلیت چرخش و نمایش عدد
+    کلاس کارت با قابلیت چرخش، نمایش عدد، و تصاویر
     """
     def __init__(self, number, position=(0, 0), **kwargs):
         super().__init__(
@@ -27,27 +125,55 @@ class NumberCard(Entity):
         self.is_flipped = False
         self.is_matched = False
         
-        # متن عدد روی کارت (در ابتدا مخفی است)
-        self.number_text = Text(
-            text=str(number),
-            parent=self,
-            position=(0, 0, -0.01),
-            scale=3,
-            origin=(0, 0),
-            color=color.black,
-            enabled=False
-        )
+        # بارگذاری تصویر اگر موجود باشد
+        self.number_texture = self._load_texture(number)
         
-        # متن پشت کارت (علامت سوال)
+        # اگر تصویر موجود نیست، از متن استفاده می‌کنیم
+        if self.number_texture:
+            # ایجاد Entity برای نمایش تصویر
+            self.number_image = Entity(
+                model='quad',
+                texture=self.number_texture,
+                parent=self,
+                position=(0, 0, -0.01),
+                scale=(1.2, 1.2),
+                enabled=False
+            )
+            self.number_text = None
+        else:
+            # استفاده از متن با خوانایی بهتر
+            self.number_image = None
+            self.number_text = Text(
+                text=str(number),
+                parent=self,
+                position=(0, 0, -0.01),
+                scale=4,  # افزایش اندازه برای خوانایی بهتر
+                origin=(0, 0),
+                color=color.black,
+                enabled=False,
+                font='assets/fonts/Arial.ttf'  # فونت واضح‌تر
+            )
+        
+        # متن پشت کارت (علامت سوال) با خوانایی بهتر
         self.back_text = Text(
             text='?',
             parent=self,
             position=(0, 0, -0.01),
-            scale=3,
+            scale=4,  # افزایش اندازه
             origin=(0, 0),
             color=color.white,
             enabled=True
         )
+    
+    def _load_texture(self, number):
+        """بارگذاری تصویر عدد از پوشه assets/textures"""
+        texture_path = Path(f'assets/textures/{number}.png')
+        if texture_path.exists():
+            try:
+                return load_texture(str(texture_path))
+            except:
+                return None
+        return None
     
     def input(self, key):
         """مدیریت کلیک روی کارت"""
@@ -55,6 +181,10 @@ class NumberCard(Entity):
             if not self.is_flipped and not self.is_matched:
                 # بررسی اینکه آیا بازی قفل است (در حال پردازش)
                 if game_manager and not game_manager.is_processing:
+                    # پخش صدای کلیک
+                    if game_manager.audio_manager:
+                        game_manager.audio_manager.play('click')
+                    
                     self.flip()
                     # اطلاع به مدیر بازی که کارت باز شد
                     if game_manager:
@@ -81,22 +211,61 @@ class NumberCard(Entity):
     
     def _show_number(self):
         """نمایش عدد و مخفی کردن پشت کارت"""
-        self.number_text.enabled = True
+        if self.number_image:
+            self.number_image.enabled = True
+        if self.number_text:
+            self.number_text.enabled = True
         self.back_text.enabled = False
         self.color = color.white
     
     def _hide_number(self):
         """مخفی کردن عدد و نمایش پشت کارت"""
-        self.number_text.enabled = False
+        if self.number_image:
+            self.number_image.enabled = False
+        if self.number_text:
+            self.number_text.enabled = False
         self.back_text.enabled = True
         self.color = color.azure
     
     def mark_as_matched(self):
-        """علامت‌گذاری کارت به عنوان جفت شده"""
+        """
+        علامت‌گذاری کارت به عنوان جفت شده با انیمیشن جذاب
+        """
         self.is_matched = True
         self.color = color.green
-        self.animate_scale(0, duration=0.3, curve=curve.in_out_expo)
-        invoke(self.disable, delay=0.3)
+        
+        # انیمیشن پرش و کوچک شدن با curve.out_back
+        original_scale = self.scale
+        
+        # مرحله 1: بزرگ شدن کمی (bounce)
+        self.animate_scale(
+            original_scale * 1.3,
+            duration=0.15,
+            curve=curve.out_back
+        )
+        
+        # مرحله 2: برگشت به اندازه نرمال
+        invoke(
+            lambda: self.animate_scale(
+                original_scale,
+                duration=0.15,
+                curve=curve.in_out_expo
+            ),
+            delay=0.15
+        )
+        
+        # مرحله 3: کوچک شدن و محو
+        invoke(
+            lambda: self.animate_scale(
+                0,
+                duration=0.4,
+                curve=curve.in_out_expo
+            ),
+            delay=0.4
+        )
+        
+        # غیرفعال کردن کارت
+        invoke(self.disable, delay=0.8)
 
 
 class GameManager:
@@ -122,6 +291,9 @@ class GameManager:
         
         # UI elements
         self.ui_texts = []
+        
+        # مدیر صداها
+        self.audio_manager = AudioManager()
         
         # ایجاد کارت‌ها
         self.create_cards()
@@ -248,6 +420,14 @@ class GameManager:
         """
         رویداد موفقیت در تطبیق (جفت درست)
         """
+        # پخش صدای موفقیت
+        if self.audio_manager:
+            self.audio_manager.play('success')
+        
+        # ایجاد ذرات جشن (confetti)
+        self.spawn_confetti(card1.position)
+        self.spawn_confetti(card2.position)
+        
         # علامت‌گذاری کارت‌ها به عنوان جفت شده
         card1.mark_as_matched()
         card2.mark_as_matched()
@@ -272,10 +452,24 @@ class GameManager:
         if self.total_matches == self.num_pairs:
             invoke(self.game_over, delay=1.0)
     
+    def spawn_confetti(self, position):
+        """
+        ایجاد ذرات جشن در موقعیت مشخص
+        """
+        import random
+        # ایجاد 8-12 ذره
+        num_particles = random.randint(8, 12)
+        for _ in range(num_particles):
+            ConfettiParticle(position=position)
+    
     def on_match_failure(self, card1, card2):
         """
         رویداد شکست در تطبیق (جفت نادرست)
         """
+        # پخش صدای اشتباه
+        if self.audio_manager:
+            self.audio_manager.play('wrong')
+        
         # نمایش بازخورد منفی
         self.show_feedback('تلاش دوباره! ✗', color.red, 1.5)
         
