@@ -115,7 +115,7 @@ class GameMenu(Entity):
         # عنوان
         self.title = Text(
             text='🎮 بازی حافظه کودکان 🎮',
-            position=(0, 0.3),
+            position=(0, 0.35),
             origin=(0, 0),
             scale=3,
             color=color.yellow
@@ -126,18 +126,29 @@ class GameMenu(Entity):
             text='▶ شروع بازی',
             color=color.rgb(100, 200, 100),
             scale=(0.3, 0.1),
-            position=(0, 0.05),
+            position=(0, 0.10),
             on_click=self.start_game
         )
         start_btn.text_entity.scale = 2
         self.buttons.append(start_btn)
+        
+        # دکمه راهنما
+        help_btn = Button(
+            text='❓ راهنما',
+            color=color.rgb(200, 150, 100),
+            scale=(0.3, 0.1),
+            position=(0, -0.05),
+            on_click=self.show_help
+        )
+        help_btn.text_entity.scale = 2
+        self.buttons.append(help_btn)
         
         # دکمه تنظیمات
         settings_btn = Button(
             text='⚙ تنظیمات',
             color=color.rgb(100, 150, 200),
             scale=(0.3, 0.1),
-            position=(0, -0.10),
+            position=(0, -0.20),
             on_click=self.show_settings
         )
         settings_btn.text_entity.scale = 2
@@ -148,7 +159,7 @@ class GameMenu(Entity):
             text='✖ خروج',
             color=color.rgb(200, 100, 100),
             scale=(0.3, 0.1),
-            position=(0, -0.25),
+            position=(0, -0.35),
             on_click=application.quit
         )
         exit_btn.text_entity.scale = 2
@@ -171,6 +182,11 @@ class GameMenu(Entity):
         """نمایش منوی تنظیمات"""
         self.hide()
         settings_menu = SettingsMenu()
+    
+    def show_help(self):
+        """نمایش راهنمای بازی"""
+        self.hide()
+        help_window = HelpWindow()
     
     def hide(self):
         """مخفی کردن منو"""
@@ -320,6 +336,95 @@ class SettingsMenu(Entity):
     
     def destroy(self):
         """حذف منوی تنظیمات"""
+        for elem in self.ui_elements:
+            destroy(elem)
+
+
+class HelpWindow(Entity):
+    """
+    پنجره راهنمای بازی
+    """
+    def __init__(self):
+        super().__init__()
+        self.ui_elements = []
+        self.create_help()
+    
+    def create_help(self):
+        """ایجاد پنجره راهنما"""
+        # عنوان
+        title = Text(
+            text='❓ راهنمای بازی',
+            position=(0, 0.40),
+            origin=(0, 0),
+            scale=2.5,
+            color=color.orange
+        )
+        self.ui_elements.append(title)
+        
+        # قوانین بازی به زبان ساده برای دانش‌آموزان
+        rules_lines = [
+            '📌 هدف بازی:',
+            'پیدا کردن جفت کارت‌های یکسان',
+            '',
+            '🎮 نحوه بازی:',
+            '۱. روی یک کارت کلیک کن تا عدد آن را ببینی',
+            '۲. روی کارت دیگری کلیک کن',
+            '۳. اگر دو عدد یکسان باشند، کارت‌ها می‌مانند',
+            '۴. اگر متفاوت باشند، دوباره پنهان می‌شوند',
+            '',
+            '⭐ نکات مهم:',
+            '• سعی کن جای اعداد را یادت بماند',
+            '• با هر جفت درست، امتیاز می‌گیری',
+            '• در بازی چند نفره، نوبت‌ها عوض می‌شود',
+            '',
+            '🎯 بازنده نداریم! همه یاد می‌گیرند! 🎯'
+        ]
+        
+        y_position = 0.25
+        for line in rules_lines:
+            if line.startswith('📌') or line.startswith('🎮') or line.startswith('⭐'):
+                # عناوین اصلی
+                scale = 1.8
+                text_color = color.yellow
+            elif line.startswith('🎯'):
+                # پیام پایانی
+                scale = 1.6
+                text_color = color.green
+            else:
+                # متن عادی
+                scale = 1.3
+                text_color = color.white
+            
+            rule_text = Text(
+                text=line,
+                position=(0, y_position),
+                origin=(0, 0),
+                scale=scale,
+                color=text_color
+            )
+            self.ui_elements.append(rule_text)
+            y_position -= 0.055  # فاصله بین خطوط
+        
+        # دکمه بستن
+        close_btn = Button(
+            text='✓ فهمیدم!',
+            color=color.rgb(100, 200, 100),
+            scale=(0.25, 0.08),
+            position=(0, -0.42),
+            on_click=self.close_help
+        )
+        close_btn.text_entity.scale = 1.8
+        self.ui_elements.append(close_btn)
+    
+    def close_help(self):
+        """بستن پنجره راهنما"""
+        global game_menu
+        self.destroy()
+        if game_menu:
+            game_menu.show()
+    
+    def destroy(self):
+        """حذف پنجره راهنما"""
         for elem in self.ui_elements:
             destroy(elem)
 
@@ -494,14 +599,29 @@ class NumberCard(Entity):
             if not self.is_flipped and not self.is_matched:
                 # بررسی اینکه آیا بازی قفل است (در حال پردازش)
                 if game_manager and not game_manager.is_processing:
+                    # قفل کردن بازی در حین انیمیشن چرخش (0.3 ثانیه)
+                    game_manager.is_processing = True
+                    
                     # پخش صدای کلیک
                     if game_manager.audio_manager:
                         game_manager.audio_manager.play('click')
                     
                     self.flip()
+                    
+                    # باز کردن قفل بعد از اتمام انیمیشن چرخش
+                    invoke(lambda: self._unlock_after_flip(), delay=0.3)
+                    
                     # اطلاع به مدیر بازی که کارت باز شد
                     if game_manager:
                         game_manager.on_card_flipped(self)
+    
+    def _unlock_after_flip(self):
+        """باز کردن قفل بازی بعد از اتمام انیمیشن چرخش"""
+        if game_manager:
+            # فقط اگر دو کارت باز نشده باشد، قفل را باز کن
+            # اگر دو کارت باز شده، check_match مسئول باز کردن قفل است
+            if len(game_manager.flipped_cards) < 2:
+                game_manager.is_processing = False
     
     def flip(self):
         """چرخش کارت با انیمیشن نرم"""
@@ -751,7 +871,7 @@ class GameManager:
         
         # اگر دو کارت باز شد، بررسی تطبیق
         if len(self.flipped_cards) == 2:
-            self.is_processing = True  # قفل کردن بازی
+            # is_processing قبلاً در input تنظیم شده
             invoke(self.check_match, delay=0.5)  # کمی صبر برای نمایش کارت دوم
     
     def check_match(self):
@@ -933,8 +1053,21 @@ class GameManager:
         """بازگشت به منوی اصلی"""
         global game_manager, game_menu
         
-        # حذف تمام المان‌های بازی
+        # حذف تمام ذرات confetti که ممکن است باقی مانده باشند
+        # جستجو و حذف تمام اشیاء ConfettiParticle
+        for entity in scene.entities[:]:  # کپی لیست برای جلوگیری از تغییر در حین حلقه
+            if isinstance(entity, ConfettiParticle):
+                destroy(entity)
+        
+        # حذف تمام کارت‌ها
         for card in self.cards:
+            # حذف تصاویر و متن‌های مرتبط با کارت
+            if hasattr(card, 'number_image') and card.number_image:
+                destroy(card.number_image)
+            if hasattr(card, 'number_text') and card.number_text:
+                destroy(card.number_text)
+            if hasattr(card, 'back_text') and card.back_text:
+                destroy(card.back_text)
             destroy(card)
         
         # حذف UI elements
@@ -949,6 +1082,11 @@ class GameManager:
         
         if hasattr(self, 'back_btn'):
             destroy(self.back_btn)
+        
+        # پاکسازی لیست‌ها
+        self.cards.clear()
+        self.ui_texts.clear()
+        self.flipped_cards.clear()
         
         # بازگشت به منو
         game_manager = None
