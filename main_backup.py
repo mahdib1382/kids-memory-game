@@ -1,327 +1,14 @@
 """
 بازی حافظه کودکان (Kids Memory Game)
-فاز پنجم: UI/UX - منو، تنظیمات، امتیازبندی، و گوینده
+فاز سوم و چهارم: جلوه‌های بصری، صداگذاری، و ذرات
 """
 
 from ursina import *
 from pathlib import Path
 import os
-import json
-import time
-from datetime import datetime
 
 # متغیر سراسری برای مدیر بازی (برای دسترسی از کارت‌ها)
 game_manager = None
-game_menu = None
-current_settings = {'num_players': 2, 'level_start': 1, 'num_pairs': 6, 'voiceover_enabled': True}
-
-
-class DataManager:
-    """
-    مدیر ذخیره‌سازی داده‌ها در JSON
-    """
-    def __init__(self, filename='game_results.json'):
-        self.filename = filename
-        self.filepath = Path(filename)
-    
-    def save_game_result(self, winner, game_time, num_players, scores):
-        """ذخیره نتیجه بازی"""
-        try:
-            # خواندن داده‌های قبلی
-            if self.filepath.exists():
-                with open(self.filepath, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-            else:
-                data = {'games': []}
-            
-            # اضافه کردن بازی جدید
-            game_result = {
-                'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                'winner': winner,
-                'game_time': round(game_time, 2),
-                'num_players': num_players,
-                'scores': scores
-            }
-            
-            data['games'].append(game_result)
-            
-            # ذخیره در فایل
-            with open(self.filepath, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            
-            print(f"✅ نتیجه بازی ذخیره شد: {self.filename}")
-        except Exception as e:
-            print(f"⚠️ خطا در ذخیره نتیجه: {e}")
-    
-    def get_recent_games(self, count=10):
-        """دریافت آخرین بازی‌ها"""
-        try:
-            if self.filepath.exists():
-                with open(self.filepath, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                    return data['games'][-count:]
-            return []
-        except:
-            return []
-
-
-class VoiceoverManager:
-    """
-    مدیر گوینده برای خواندن اعداد به فارسی
-    """
-    def __init__(self):
-        self.voices = {}
-        self.enabled = True
-        self.load_voiceovers()
-    
-    def load_voiceovers(self):
-        """بارگذاری فایل‌های صوتی اعداد"""
-        voice_path = Path('assets/voices')
-        if voice_path.exists():
-            # بارگذاری اعداد 1 تا 20
-            for i in range(1, 21):
-                voice_file = voice_path / f'{i}.mp3'
-                if voice_file.exists():
-                    try:
-                        self.voices[i] = Audio(str(voice_file), loop=False, autoplay=False)
-                    except:
-                        pass
-    
-    def speak_number(self, number):
-        """پخش صدای عدد"""
-        if self.enabled and number in self.voices:
-            try:
-                self.voices[number].play()
-            except:
-                pass
-    
-    def set_enabled(self, enabled):
-        """فعال/غیرفعال کردن گوینده"""
-        self.enabled = enabled
-
-
-class GameMenu(Entity):
-    """
-    منوی اصلی بازی
-    """
-    def __init__(self):
-        super().__init__()
-        self.buttons = []
-        self.title = None
-        self.create_menu()
-    
-    def create_menu(self):
-        """ایجاد منوی اصلی"""
-        # عنوان
-        self.title = Text(
-            text='🎮 بازی حافظه کودکان 🎮',
-            position=(0, 0.3),
-            origin=(0, 0),
-            scale=3,
-            color=color.yellow
-        )
-        
-        # دکمه شروع بازی
-        start_btn = Button(
-            text='▶ شروع بازی',
-            color=color.rgb(100, 200, 100),
-            scale=(0.3, 0.1),
-            position=(0, 0.05),
-            on_click=self.start_game
-        )
-        start_btn.text_entity.scale = 2
-        self.buttons.append(start_btn)
-        
-        # دکمه تنظیمات
-        settings_btn = Button(
-            text='⚙ تنظیمات',
-            color=color.rgb(100, 150, 200),
-            scale=(0.3, 0.1),
-            position=(0, -0.10),
-            on_click=self.show_settings
-        )
-        settings_btn.text_entity.scale = 2
-        self.buttons.append(settings_btn)
-        
-        # دکمه خروج
-        exit_btn = Button(
-            text='✖ خروج',
-            color=color.rgb(200, 100, 100),
-            scale=(0.3, 0.1),
-            position=(0, -0.25),
-            on_click=application.quit
-        )
-        exit_btn.text_entity.scale = 2
-        self.buttons.append(exit_btn)
-    
-    def start_game(self):
-        """شروع بازی جدید"""
-        global game_manager
-        self.hide()
-        
-        # ایجاد مدیر بازی با تنظیمات فعلی
-        game_manager = GameManager(
-            num_pairs=current_settings['num_pairs'],
-            num_players=current_settings['num_players'],
-            level_start=current_settings['level_start'],
-            voiceover_enabled=current_settings['voiceover_enabled']
-        )
-    
-    def show_settings(self):
-        """نمایش منوی تنظیمات"""
-        self.hide()
-        settings_menu = SettingsMenu()
-    
-    def hide(self):
-        """مخفی کردن منو"""
-        if self.title:
-            self.title.enabled = False
-        for btn in self.buttons:
-            btn.enabled = False
-    
-    def show(self):
-        """نمایش منو"""
-        if self.title:
-            self.title.enabled = True
-        for btn in self.buttons:
-            btn.enabled = True
-
-
-class SettingsMenu(Entity):
-    """
-    منوی تنظیمات بازی
-    """
-    def __init__(self):
-        super().__init__()
-        self.ui_elements = []
-        self.create_settings()
-    
-    def create_settings(self):
-        """ایجاد منوی تنظیمات"""
-        # عنوان
-        title = Text(
-            text='⚙ تنظیمات',
-            position=(0, 0.35),
-            origin=(0, 0),
-            scale=2.5,
-            color=color.cyan
-        )
-        self.ui_elements.append(title)
-        
-        # تنظیم تعداد بازیکنان
-        players_text = Text(
-            text=f'تعداد بازیکنان: {current_settings["num_players"]}',
-            position=(-0.35, 0.15),
-            origin=(0, 0),
-            scale=1.5,
-            color=color.white
-        )
-        self.ui_elements.append(players_text)
-        
-        players_minus = Button(
-            text='−',
-            color=color.red,
-            scale=(0.08, 0.08),
-            position=(-0.1, 0.15),
-            on_click=Func(self.change_players, -1, players_text)
-        )
-        players_minus.text_entity.scale = 2
-        self.ui_elements.append(players_minus)
-        
-        players_plus = Button(
-            text='+',
-            color=color.green,
-            scale=(0.08, 0.08),
-            position=(0, 0.15),
-            on_click=Func(self.change_players, 1, players_text)
-        )
-        players_plus.text_entity.scale = 2
-        self.ui_elements.append(players_plus)
-        
-        # تنظیم محدوده اعداد
-        level_text = Text(
-            text=f'محدوده اعداد: {current_settings["level_start"]}-{current_settings["level_start"]+current_settings["num_pairs"]-1}',
-            position=(-0.35, 0.0),
-            origin=(0, 0),
-            scale=1.5,
-            color=color.white
-        )
-        self.ui_elements.append(level_text)
-        
-        level_options = ['1-10', '11-20']
-        level_btn = Button(
-            text='تغییر محدوده',
-            color=color.orange,
-            scale=(0.2, 0.08),
-            position=(0.05, 0.0),
-            on_click=Func(self.cycle_level, level_text)
-        )
-        level_btn.text_entity.scale = 1.5
-        self.ui_elements.append(level_btn)
-        
-        # تنظیم گوینده
-        voiceover_text = Text(
-            text=f'گوینده: {"فعال" if current_settings["voiceover_enabled"] else "غیرفعال"}',
-            position=(-0.35, -0.15),
-            origin=(0, 0),
-            scale=1.5,
-            color=color.white
-        )
-        self.ui_elements.append(voiceover_text)
-        
-        voiceover_btn = Button(
-            text='تغییر',
-            color=color.magenta,
-            scale=(0.15, 0.08),
-            position=(0.05, -0.15),
-            on_click=Func(self.toggle_voiceover, voiceover_text)
-        )
-        voiceover_btn.text_entity.scale = 1.5
-        self.ui_elements.append(voiceover_btn)
-        
-        # دکمه بازگشت
-        back_btn = Button(
-            text='↩ بازگشت',
-            color=color.gray,
-            scale=(0.2, 0.08),
-            position=(0, -0.35),
-            on_click=self.back_to_menu
-        )
-        back_btn.text_entity.scale = 1.5
-        self.ui_elements.append(back_btn)
-    
-    def change_players(self, delta, text_obj):
-        """تغییر تعداد بازیکنان"""
-        current_settings['num_players'] = max(1, min(5, current_settings['num_players'] + delta))
-        text_obj.text = f'تعداد بازیکنان: {current_settings["num_players"]}'
-    
-    def cycle_level(self, text_obj):
-        """چرخش محدوده اعداد"""
-        if current_settings['level_start'] == 1:
-            current_settings['level_start'] = 11
-            current_settings['num_pairs'] = 10
-        else:
-            current_settings['level_start'] = 1
-            current_settings['num_pairs'] = 6
-        
-        text_obj.text = f'محدوده اعداد: {current_settings["level_start"]}-{current_settings["level_start"]+current_settings["num_pairs"]-1}'
-    
-    def toggle_voiceover(self, text_obj):
-        """تغییر وضعیت گوینده"""
-        current_settings['voiceover_enabled'] = not current_settings['voiceover_enabled']
-        text_obj.text = f'گوینده: {"فعال" if current_settings["voiceover_enabled"] else "غیرفعال"}'
-    
-    def back_to_menu(self):
-        """بازگشت به منوی اصلی"""
-        global game_menu
-        self.destroy()
-        if game_menu:
-            game_menu.show()
-    
-    def destroy(self):
-        """حذف منوی تنظیمات"""
-        for elem in self.ui_elements:
-            destroy(elem)
 
 
 class AudioManager:
@@ -530,10 +217,6 @@ class NumberCard(Entity):
             self.number_text.enabled = True
         self.back_text.enabled = False
         self.color = color.white
-        
-        # پخش گوینده برای عدد
-        if game_manager and game_manager.voiceover_manager:
-            game_manager.voiceover_manager.speak_number(self.number)
     
     def _hide_number(self):
         """مخفی کردن عدد و نمایش پشت کارت"""
@@ -589,7 +272,7 @@ class GameManager:
     """
     مدیر بازی که کارت‌ها، نوبت‌ها و امتیازات را مدیریت می‌کند
     """
-    def __init__(self, num_pairs=6, num_players=1, level_start=1, voiceover_enabled=True):
+    def __init__(self, num_pairs=6, num_players=1, level_start=1):
         self.num_pairs = num_pairs
         self.num_players = max(1, min(5, num_players))  # محدود به 1-5 بازیکن
         self.level_start = level_start  # شروع محدوده سطح (مثلاً 1 برای 1-10)
@@ -606,30 +289,17 @@ class GameManager:
         # قفل برای جلوگیری از کلیک در حین پردازش
         self.is_processing = False
         
-        # زمان شروع بازی
-        self.start_time = time.time()
-        
         # UI elements
         self.ui_texts = []
         
         # مدیر صداها
         self.audio_manager = AudioManager()
         
-        # مدیر گوینده
-        self.voiceover_manager = VoiceoverManager()
-        self.voiceover_manager.set_enabled(voiceover_enabled)
-        
-        # مدیر ذخیره‌سازی داده‌ها
-        self.data_manager = DataManager()
-        
         # ایجاد کارت‌ها
         self.create_cards()
         
         # ایجاد UI
         self.create_ui()
-        
-        # ایجاد Scoreboard
-        self.create_scoreboard()
     
     def create_cards(self):
         """ایجاد و چیدمان کارت‌ها به صورت Grid"""
@@ -719,27 +389,6 @@ class GameManager:
             color=color.green,
             origin=(0, 0),
             enabled=False
-        )
-    
-    def create_scoreboard(self):
-        """ایجاد پنل امتیازات لحظه‌ای"""
-        # پس‌زمینه Scoreboard
-        self.scoreboard_bg = Entity(
-            model='quad',
-            color=color.rgba(0, 0, 0, 150),
-            scale=(0.35, 0.15 + 0.08 * self.num_players),
-            position=(0.75, 0.35),
-            z=1
-        )
-        
-        # عنوان Scoreboard
-        self.scoreboard_title = Text(
-            text='🏆 امتیازات',
-            position=(0.75, 0.42),
-            scale=1.8,
-            color=color.gold,
-            origin=(0, 0),
-            z=0
         )
     
     def on_card_flipped(self, card):
@@ -889,71 +538,17 @@ class GameManager:
         """
         پایان بازی و نمایش برنده
         """
-        # محاسبه زمان بازی
-        game_time = time.time() - self.start_time
-        
         # پیدا کردن برنده (بیشترین امتیاز)
         max_score = max(self.scores)
         winners = [i+1 for i, score in enumerate(self.scores) if score == max_score]
         
         if len(winners) == 1:
             message = f'🎉 بازیکن {winners[0]} برنده شد! 🎉'
-            winner_str = f'بازیکن {winners[0]}'
         else:
             winners_str = ', '.join(str(w) for w in winners)
             message = f'🎉 مساوی! بازیکنان {winners_str} 🎉'
-            winner_str = f'مساوی ({winners_str})'
         
-        # ذخیره نتیجه در JSON
-        self.data_manager.save_game_result(
-            winner=winner_str,
-            game_time=game_time,
-            num_players=self.num_players,
-            scores=self.scores
-        )
-        
-        # نمایش پیام و دکمه بازگشت
-        self.show_feedback(message, color.gold, 10.0)
-        
-        # دکمه بازگشت به منو
-        invoke(self.show_back_button, delay=2.0)
-    
-    def show_back_button(self):
-        """نمایش دکمه بازگشت به منو"""
-        self.back_btn = Button(
-            text='🏠 بازگشت به منو',
-            color=color.rgb(100, 150, 200),
-            scale=(0.3, 0.1),
-            position=(0, -0.3),
-            on_click=self.return_to_menu
-        )
-        self.back_btn.text_entity.scale = 2
-    
-    def return_to_menu(self):
-        """بازگشت به منوی اصلی"""
-        global game_manager, game_menu
-        
-        # حذف تمام المان‌های بازی
-        for card in self.cards:
-            destroy(card)
-        
-        # حذف UI elements
-        for ui_text in self.ui_texts:
-            destroy(ui_text)
-        
-        destroy(self.turn_text)
-        destroy(self.level_text)
-        destroy(self.feedback_text)
-        destroy(self.scoreboard_bg)
-        destroy(self.scoreboard_title)
-        
-        if hasattr(self, 'back_btn'):
-            destroy(self.back_btn)
-        
-        # بازگشت به منو
-        game_manager = None
-        if game_menu:
-            game_menu.show()
+        self.show_feedback(message, color.gold, 5.0)
     
     def update(self):
         """
@@ -977,7 +572,7 @@ def setup_window():
 
 def main():
     """تابع اصلی اجرای برنامه"""
-    global game_manager, game_menu
+    global game_manager
     
     # راه‌اندازی موتور Ursina
     app = Ursina()
@@ -988,8 +583,11 @@ def main():
     # تنظیم رنگ پس‌زمینه
     window.color = color.rgb(40, 40, 60)
     
-    # ایجاد منوی اصلی
-    game_menu = GameMenu()
+    # ایجاد مدیر بازی
+    # num_pairs: تعداد جفت کارت‌ها
+    # num_players: تعداد بازیکنان (1 تا 5)
+    # level_start: شماره شروع محدوده (مثلاً 1 برای 1-10، 11 برای 11-20)
+    game_manager = GameManager(num_pairs=6, num_players=2, level_start=1)
     
     # اجرای برنامه
     app.run()
