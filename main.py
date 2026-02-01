@@ -351,7 +351,8 @@ class GameManager:
         if len(winners) == 1:
             message = f'🎉 بازیکن {winners[0]} برنده شد! 🎉'
         else:
-            message = f'🎉 مساوی! بازیکنان {", ".join(map(str, winners))} 🎉'
+            winners_str = ', '.join(str(w) for w in winners)
+            message = f'🎉 مساوی! بازیکنان {winners_str} 🎉'
         
         self.show_feedback(message, color.gold, 5.0)
     
