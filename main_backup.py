@@ -150,8 +150,7 @@ class NumberCard(Entity):
                 scale=4,  # افزایش اندازه برای خوانایی بهتر
                 origin=(0, 0),
                 color=color.black,
-                enabled=False,
-                font='assets/fonts/Arial.ttf'  # فونت واضح‌تر
+                enabled=False
             )
         
         # متن پشت کارت (علامت سوال) با خوانایی بهتر
