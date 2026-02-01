@@ -27,7 +27,8 @@ class NumberCard(Entity):
         # متن عدد روی کارت (در ابتدا مخفی است)
         self.number_text = Text(
             text=str(number),
-            position=self.position,
+            parent=self,
+            position=(0, 0, -0.01),
             scale=3,
             origin=(0, 0),
             color=color.black,
@@ -37,7 +38,8 @@ class NumberCard(Entity):
         # متن پشت کارت (علامت سوال)
         self.back_text = Text(
             text='?',
-            position=self.position,
+            parent=self,
+            position=(0, 0, -0.01),
             scale=3,
             origin=(0, 0),
             color=color.white,
@@ -147,7 +149,10 @@ class GameManager:
                 idx += 1
     
     def update(self):
-        """به‌روزرسانی وضعیت بازی (فعلاً خالی)"""
+        """
+        به‌روزرسانی وضعیت بازی
+        در فاز 2 برای بررسی جفت‌ها و مدیریت نوبت استفاده خواهد شد
+        """
         pass
 
 
